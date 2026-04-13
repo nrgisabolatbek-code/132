@@ -1,75 +1,36 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
-from google.cloud import vision
-from google.oauth2 import service_account
-from docx import Document
 import os
-import json
-import uuid
+from fastapi import FastAPI, Request, UploadFile, File
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+import google.generativeai as genai
+from PIL import Image
+import io
 
 app = FastAPI()
+templates = Jinja2Templates(directory=".")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def get_client():
-    key_data = json.loads(os.environ["GOOGLE_KEY"])
-    credentials = service_account.Credentials.from_service_account_info(key_data)
-    return vision.ImageAnnotatorClient(credentials=credentials)
-
-def run_ocr(image_bytes):
-    client = get_client()
-    image = vision.Image(content=image_bytes)
-
-    response = client.document_text_detection(image=image)
-
-    if response.error.message:
-        raise Exception(response.error.message)
-
-    text = response.full_text_annotation.text
-
-    if not text.strip():
-        return "Мәтін табылмады"
-
-    return text
+# Gemini конфигурациясы
+genai.configure(api_key="AIzaSyA7O2n8B-yyF7WdNKJIcpYPfNL4fvrzP2k")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 @app.get("/", response_class=HTMLResponse)
-def home():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        text = run_ocr(contents)
-        return {"text": text}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+async def upload_image(file: UploadFile = File(...)):
+    request_object_content = await file.read()
+    img = Image.open(io.BytesIO(request_object_content))
+    
+    # Gemini-ге сұрақ жіберу
+    response = model.generate_content([
+        "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
+        img
+    ])
+    
+    return {"text": response.text}
 
-@app.post("/upload-docx")
-async def upload_docx(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        text = run_ocr(contents)
-
-        filename = f"ocr_result_{uuid.uuid4().hex[:8]}.docx"
-
-        doc = Document()
-        doc.add_heading("Распознанный мәтін", 0)
-        doc.add_paragraph(text)
-        doc.save(filename)
-
-        return FileResponse(
-            path=filename,
-            filename="result.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
