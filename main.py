@@ -9,7 +9,7 @@ from PIL import Image
 app = FastAPI()
 templates = Jinja2Templates(directory=".")
 
-# Жаңа API кілтің
+# API Key (Жаңа кілтіңіз)
 API_KEY = "AIzaSyBQBTNk3l18J3mFj4scTRUnK-WZcLYxjEY"
 genai.configure(api_key=API_KEY)
 
@@ -23,18 +23,19 @@ async def upload_image(file: UploadFile = File(...)):
         content = await file.read()
         img = Image.open(io.BytesIO(content))
         
-        # Ең тұрақты модельді қолдану
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
-
+        # МАҢЫЗДЫ: Модельдің атын тұрақты нұсқаға ауыстырдық
+        model = genai.GenerativeModel("gemini-pro-vision")
+        
+        # Суретті тану сұранысы
         response = model.generate_content([
-       "Суреттегі барлық мәтінді оқы. Тек мәтінді қайтар.",
-        img
-])
+            "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
+            img
         ])
         
         return {"text": response.text}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"text": f"Қате: {str(e)}"})
+        # Қате болса, нақты себебін экранға шығару
+        return JSONResponse(status_code=500, content={"text": f"Gemini қатесі: {str(e)}"})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
