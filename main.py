@@ -1,37 +1,39 @@
 import os
+import io
+import google.generativeai as genai
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-import google.generativeai as genai
+from fastapi.responses import HTMLResponse, JSONResponse
 from PIL import Image
-import io
 
 app = FastAPI()
 
-# Түзету: Мұнда папканы дұрыс көрсету маңызды
+# index.html қайда тұрғанын тексер. Егер негізгі бетте болса "." қалдыр
 templates = Jinja2Templates(directory=".")
 
+# API Key
 genai.configure(api_key="AIzaSyA7O2n8B-yyF7WdNKJIcpYPfNL4fvrzP2k")
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    # ТҮЗЕТІЛГЕН ЖОЛ:
-    return templates.TemplateResponse(request=request, name="index.html")
+    try:
+        return templates.TemplateResponse(request=request, name="index.html")
+    except Exception as e:
+        return HTMLResponse(content=f"HTML табылмады: {str(e)}", status_code=404)
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    request_object_content = await file.read()
-    img = Image.open(io.BytesIO(request_object_content))
-    
-    response = model.generate_content([
-        "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
-        img
-    ])
-    
-    return {"text": response.text}
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    try:
+        content = await file.read()
+        img = Image.open(io.BytesIO(content))
+        
+        # Модельді дұрыс шақыру
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content([
+            "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
+            img
+        ])
+        
+        return {"text": response.text}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"text": f"Gemini қатесі: {str(e)}"})
