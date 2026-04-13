@@ -6,7 +6,7 @@ from google.colab import files
 import PIL.Image
 import io
 
-genai.configure(api_key="AIzaSyD7wzMarxEY-UzwTe4bTx7mtjTzyDCA2aY")
+genai.configure(api_key="AIzaSyA7O2n8B-yYf7WdNKJIcpYPfNL4fvrzP2k")
 
 def take_photo():
     js = Javascript('''
