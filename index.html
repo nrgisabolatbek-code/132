@@ -1,44 +1,72 @@
 <!DOCTYPE html>
-<html>
+<html lang="kk">
 <head>
+    <meta charset="UTF-8">
     <title>Мәтінді тану</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #result { 
+            margin-top: 20px; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            background: #f9f9f9;
+            min-height: 50px;
+            white-space: pre-wrap;
+        }
+        .loading { color: blue; }
+        .error { color: red; }
+    </style>
 </head>
 <body>
     <h1>Суреттегі мәтінді тану (Gemini AI)</h1>
+    
     <input type="file" id="imageInput" accept="image/*">
-    <button onclick="upload()">Тану</button>
-    <pre id="result"></pre>
+    <button onclick="uploadImage()">Тану</button>
+
+    <div id="result">Нәтиже осы жерде шығады...</div>
 
     <script>
-        async function upload() {
-       async function upload() {
-    const input = document.getElementById('imageInput');
-    if (!input.files[0]) {
-        alert("Файл таңдаңыз!");
-        return;
-    }
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
+        async function uploadImage() {
+            const input = document.getElementById('imageInput');
+            const resultDiv = document.getElementById('result');
+            
+            // 1. Файл таңдалғанын тексеру
+            if (!input.files[0]) {
+                alert("Алдымен суретті таңдаңыз!");
+                return;
+            }
 
-    document.getElementById('result').innerText = "Өңделуде...";
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
 
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (!response.ok) {
-            throw new Error('Сервер қатесі: ' + response.status);
-        }
-        
-        const data = await response.json();
-        document.getElementById('result').innerText = data.text;
-    } catch (error) {
-        document.getElementById('result').innerText = "Қате орын алды: " + error.message;
-        console.error(error);
-    }
-}
+            resultDiv.innerText = "Өңделуде, күте тұрыңыз...";
+            resultDiv.className = "loading";
+
+            try {
+                // 2. Серверге сұраныс жіберу
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                // 3. Серверден жауап келгенін тексеру
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.text || "Серверде қате болды");
+                }
+
+                const data = await response.json();
+                
+                // 4. Нәтижені шығару
+                resultDiv.innerText = data.text;
+                resultDiv.className = "";
+
+            } catch (error) {
+                // Қате болса экранға шығару
+                resultDiv.innerText = "Қате орын алды: " + error.message;
+                resultDiv.className = "error";
+                console.error("Толық қате:", error);
+            }
         }
     </script>
 </body>
