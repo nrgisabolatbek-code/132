@@ -11,18 +11,34 @@
 
     <script>
         async function upload() {
-            const input = document.getElementById('imageInput');
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
+       async function upload() {
+    const input = document.getElementById('imageInput');
+    if (!input.files[0]) {
+        alert("Файл таңдаңыз!");
+        return;
+    }
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
 
-            document.getElementById('result').innerText = "Өңделуде...";
+    document.getElementById('result').innerText = "Өңделуде...";
 
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            document.getElementById('result').innerText = data.text;
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Сервер қатесі: ' + response.status);
+        }
+        
+        const data = await response.json();
+        document.getElementById('result').innerText = data.text;
+    } catch (error) {
+        document.getElementById('result').innerText = "Қате орын алды: " + error.message;
+        console.error(error);
+    }
+}
         }
     </script>
 </body>
