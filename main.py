@@ -1,75 +1,73 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
-from google.cloud import vision
-from google.oauth2 import service_account
-from docx import Document
-import os
-import json
-import uuid
+import google.generativeai as genai
+from IPython.display import Javascript
+from google.colab.output import eval_js
+from base64 import b64decode
+from google.colab import files
+import PIL.Image
+import io
 
-app = FastAPI()
+genai.configure(api_key="AIzaSyD7wzMarxEY-UzwTe4bTx7mtjTzyDCA2aY")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def take_photo():
+    js = Javascript('''
+        async function takePhoto() {
+            const div = document.createElement('div');
+            const capture = document.createElement('button');
+            capture.textContent = '📸 Суретке түсір';
+            capture.style.fontSize = '20px';
+            capture.style.padding = '10px 20px';
+            capture.style.margin = '10px';
+            capture.style.cursor = 'pointer';
+            capture.style.backgroundColor = '#4CAF50';
+            capture.style.color = 'white';
+            capture.style.border = 'none';
+            capture.style.borderRadius = '8px';
+            const video = document.createElement('video');
+            video.style.display = 'block';
+            video.style.width = '100%';
+            const stream = await navigator.mediaDevices.getUserMedia({video: true});
+            document.body.appendChild(div);
+            div.appendChild(video);
+            div.appendChild(capture);
+            video.srcObject = stream;
+            await video.play();
+            await new Promise((resolve) => capture.onclick = resolve);
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            stream.getTracks().forEach(track => track.stop());
+            div.remove();
+            return canvas.toDataURL('image/jpeg', 0.9);
+        }
+        takePhoto()
+    ''')
+    data = eval_js(js.data)
+    binary = b64decode(data.split(',')[1])
+    image = PIL.Image.open(io.BytesIO(binary))
+    print("✅ Сурет түсірілді!")
+    return image
 
-def get_client():
-    key_data = json.loads(os.environ["GOOGLE_KEY"])
-    credentials = service_account.Credentials.from_service_account_info(key_data)
-    return vision.ImageAnnotatorClient(credentials=credentials)
+# 1. Суретке түс
+image = take_photo()
 
-def run_ocr(image_bytes):
-    client = get_client()
-    image = vision.Image(content=image_bytes)
+# 2. Gemini арқылы тану
+model = genai.GenerativeModel("gemini-flash-latest")
+response = model.generate_content([
+    image,
+    "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба."
+])
 
-    response = client.document_text_detection(image=image)
+tanylgan_matn = response.text
 
-    if response.error.message:
-        raise Exception(response.error.message)
+# 3. Экранға шығар
+print("✅ Танылған мәтін:")
+print("-" * 40)
+print(tanylgan_matn)
 
-    text = response.full_text_annotation.text
+# 4. TXT файл жасап жүктеу
+with open("natije.txt", "w", encoding="utf-8") as f:
+    f.write(tanylgan_matn)
 
-    if not text.strip():
-        return "Мәтін табылмады"
-
-    return text
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-@app.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        text = run_ocr(contents)
-        return {"text": text}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.post("/upload-docx")
-async def upload_docx(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        text = run_ocr(contents)
-
-        filename = f"ocr_result_{uuid.uuid4().hex[:8]}.docx"
-
-        doc = Document()
-        doc.add_heading("Распознанный мәтін", 0)
-        doc.add_paragraph(text)
-        doc.save(filename)
-
-        return FileResponse(
-            path=filename,
-            filename="result.docx",
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+files.download("natije.txt")
+print("✅ natije.txt файлы жүктелді!")
