@@ -22,8 +22,8 @@ async def upload_image(file: UploadFile = File(...)):
         content = await file.read()
         img = Image.open(io.BytesIO(content))
         
-        # МОДЕЛЬ АТЫ ӨЗГЕРТІЛДІ:
-        model = genai.GenerativeModel("gemini-pro-vision")
+        # Модельді жаңаша шақыру
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         
         response = model.generate_content([
             "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
