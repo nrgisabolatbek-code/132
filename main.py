@@ -24,11 +24,12 @@ async def upload_image(file: UploadFile = File(...)):
         img = Image.open(io.BytesIO(content))
         
         # Ең тұрақты модельді қолдану
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+
         response = model.generate_content([
-            "Суреттегі барлық қолтаңба жазуларды оқы. Тек жазылған мәтінді ғана жаз, басқа ештеңе жазба.",
-            img
+       "Суреттегі барлық мәтінді оқы. Тек мәтінді қайтар.",
+        img
+])
         ])
         
         return {"text": response.text}
